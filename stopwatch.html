@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bunny Puff Stopwatch</title>
+<style>
+  :root {
+    --ink: #3b2a78;
+    --shadow: #8a6fe0;
+    --lav: #c9b6f7;
+    --cream: #fbf7ff;
+    --hotpink: #ff7fb8;
+    --yellow: #ffd84a;
+    --lime: #a6e83f;
+    --blue: #3f7bff;
+    --lilac: #cdb8ff;
+    --stamp: #ff8a2b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; justify-content: center;
+    padding: 176px 16px 64px; color: var(--ink);
+    font-family: "Trebuchet MS", "Malgun Gothic", "Segoe UI", sans-serif;
+    background: linear-gradient(180deg, #a88bf0 0%, #d3a8f3 50%, #ffc0ea 100%) fixed;
+  }
+
+  /* ---------- 무대 배경 ---------- */
+  .stage { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  .stage > *, .floor > * { position: absolute; }
+
+  /* 보케 조명 */
+  .bokeh {
+    inset: 0;
+    background:
+      radial-gradient(circle 70px at 12% 22%, #ffffff55 0 60%, transparent 100%),
+      radial-gradient(circle 50px at 86% 30%, #ffd0f655 0 60%, transparent 100%),
+      radial-gradient(circle 90px at 78% 70%, #ffffff33 0 60%, transparent 100%),
+      radial-gradient(circle 60px at 22% 62%, #ffb8ee44 0 60%, transparent 100%),
+      radial-gradient(circle 40px at 50% 12%, #ffffff44 0 60%, transparent 100%),
+      radial-gradient(circle 120px at 50% 55%, #ffffff22 0 60%, transparent 100%);
+  }
+  /* 큰 파스텔 구체 */
+  .orb { border-radius: 50%; background: radial-gradient(circle at 34% 28%, #fff 0, #f6c9f3 38%, #c9a8ff 100%); box-shadow: inset -12px -16px 30px #8a6fe055; }
+  .orb.a { width: 260px; height: 260px; left: -90px; top: 24%; opacity: .8; }
+  .orb.b { width: 190px; height: 190px; right: -60px; top: 46%; opacity: .75; }
+  .orb.c { width: 120px; height: 120px; left: 9%; bottom: 190px; opacity: .7; }
+
+  /* 야자수 */
+  .palm { bottom: 120px; width: 230px; height: 330px; opacity: .6; }
+  .palm.l { left: -42px; }
+  .palm.r { right: -42px; transform: scaleX(-1); }
+
+  /* 요정 조명 */
+  .lights { top: 0; left: 0; width: 100%; height: 70px; }
+  .lights circle { animation: twinkle 2.4s ease-in-out infinite; }
+  @keyframes twinkle { 50% { opacity: .35; } }
+
+  /* 미러볼 */
+  .ball { top: 0; right: 7%; width: 74px; height: 150px; transform-origin: 50% 0; animation: swing 4s ease-in-out infinite alternate; }
+  @keyframes swing { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
+
+  /* 반짝이 */
+  .spark { color: #fff; text-shadow: 0 0 8px #fff, 0 0 16px #ffb6f0; animation: twinkle 2.2s ease-in-out infinite; }
+
+  /* 바닥: 프로스팅 카운터 + 계단 */
+  .floor { left: 0; right: 0; bottom: 0; height: 150px; }
+  .floor .steps { left: 0; right: 0; bottom: 0; height: 48px; border-top: 4px solid #6a4fc0; background: repeating-linear-gradient(180deg, #e3d4ff 0 16px, #f6dcff 16px 32px); }
+  .floor .counter-bg {
+    left: 0; right: 0; bottom: 48px; height: 102px;
+    background:
+      radial-gradient(circle 6px at 50% 34px, #fff 55%, transparent 100%) 0 0 / 76px 100% repeat-x,
+      radial-gradient(ellipse 26px 40px at 50% 100%, #8a6be0 97%, transparent 100%) 0 0 / 76px 100% repeat-x,
+      #bca6f7;
+  }
+  .floor .counter-bg::before { /* 핑크 프로스팅 */
+    content: ""; position: absolute; left: 0; right: 0; top: -2px; height: 26px;
+    background: radial-gradient(circle 15px at 50% 0, #ff9ee3 97%, transparent 100%) 0 0 / 38px 100% repeat-x;
+  }
+  /* 필름 노이즈 */
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 99;
+    opacity: .14; mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .3  0 0 0 0 .3  0 0 0 0 .4  0 0 0 .9 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");
+  }
+  .wrap { width: 100%; max-width: 420px; position: relative; }
+
+  /* 무대 뒤 커다란 토끼 */
+  .tokki {
+    position: absolute; top: -146px; left: 50%; width: 150px; height: 159px; z-index: 0;
+    transform: translateX(-50%); transform-origin: 50% 100%;
+    filter: drop-shadow(3px 3px 0 var(--shadow)); pointer-events: none;
+  }
+  @keyframes wig { from { transform: translateX(-50%) rotate(-2.5deg); } to { transform: translateX(-50%) rotate(2.5deg); } }
+  body.running .tokki { animation: wig .45s ease-in-out infinite alternate; }
+
+  /* 다섯 소녀 */
+  .girls {
+    position: absolute; top: -80px; left: 0; right: 0; height: 92px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 0 8px; z-index: 0; pointer-events: none;
+  }
+  .girl { width: 72px; height: 92px; filter: drop-shadow(3px 3px 0 var(--shadow)); }
+  .girl:nth-child(even) { margin-top: -12px; }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-11px); } }
+  body.running .girl { animation: bob .5s ease-in-out infinite; }
+  body.running .girl:nth-child(2) { animation-delay: .1s; }
+  body.running .girl:nth-child(3) { animation-delay: .2s; }
+  body.running .girl:nth-child(4) { animation-delay: .3s; }
+  body.running .girl:nth-child(5) { animation-delay: .4s; }
+
+  /* 굿즈 케이스 */
+  .card {
+    position: relative; z-index: 1; padding: 0 22px 0;
+    background: var(--cream); border: 4px solid var(--ink);
+    border-radius: 34px; box-shadow: 0 0 0 5px #fff, 8px 12px 0 5px var(--shadow);
+    overflow: hidden;
+  }
+  .banner {
+    margin: 0 -22px 18px; padding: 16px 10px 11px; text-align: center;
+    font: 900 20px "Arial Black", "Trebuchet MS", sans-serif; letter-spacing: 1px; color: #fff;
+    -webkit-text-stroke: 1px var(--ink); text-shadow: 2px 2px 0 var(--ink);
+    background: linear-gradient(90deg, var(--hotpink) 0 20%, var(--yellow) 20% 40%, var(--lime) 40% 60%, var(--blue) 60% 80%, var(--lilac) 80%);
+    border-bottom: 4px solid var(--ink);
+  }
+
+  /* 디카 뷰파인더 */
+  .screen {
+    position: relative; padding: 24px 10px 14px; text-align: center;
+    background: linear-gradient(180deg, #f1e8ff, #ffd9f3);
+    border: 4px solid var(--ink); border-radius: 18px;
+    box-shadow: inset 0 4px 12px #8a6fe040, 4px 4px 0 var(--shadow);
+  }
+  .screen i { position: absolute; width: 18px; height: 18px; border: 3px solid var(--ink); opacity: .7; }
+  .screen i:nth-child(1) { top: 8px; left: 8px; border-right: 0; border-bottom: 0; }
+  .screen i:nth-child(2) { top: 8px; right: 8px; border-left: 0; border-bottom: 0; }
+  .screen i:nth-child(3) { bottom: 8px; left: 8px; border-right: 0; border-top: 0; }
+  .screen i:nth-child(4) { bottom: 8px; right: 8px; border-left: 0; border-top: 0; }
+  .rec { position: absolute; top: 10px; left: 32px; font-size: 11px; font-weight: 900; letter-spacing: 1px; opacity: .45; }
+  body.running .rec { opacity: 1; color: #e0446f; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+  .batt { position: absolute; top: 10px; right: 32px; font-size: 11px; font-weight: 900; }
+  .time {
+    font-family: "Consolas", "Courier New", monospace; font-weight: 900;
+    font-size: clamp(42px, 13vw, 64px); color: var(--ink);
+    font-variant-numeric: tabular-nums; letter-spacing: -1px; text-shadow: 3px 3px 0 #fff;
+    margin-top: 6px;
+  }
+  .stamp {
+    font-family: "Courier New", monospace; font-weight: 900; font-size: 13px;
+    color: var(--stamp); letter-spacing: 2px; margin-top: 2px;
+    text-shadow: 0 0 4px #ff8a2b88;
+  }
+
+  /* 토끼 응원봉 버튼 */
+  .buttons { display: flex; justify-content: space-around; margin: 42px 0 20px; }
+  .bbtn { position: relative; width: 92px; height: 92px; }
+  .bbtn::before, .bbtn::after {
+    content: ""; position: absolute; top: -36px; width: 28px; height: 54px;
+    background: radial-gradient(ellipse 6px 16px at 50% 58%, var(--lilac) 98%, transparent 100%), #fff;
+    border: 3px solid var(--ink); border-radius: 50% 50% 42% 42% / 70% 70% 30% 30%;
+  }
+  .bbtn::before { left: 12px; transform: rotate(-9deg); }
+  .bbtn::after { right: 12px; transform: rotate(9deg); }
+  button {
+    position: relative; z-index: 1; width: 92px; height: 92px; border-radius: 50%; cursor: pointer;
+    font: 900 17px "Trebuchet MS", "Malgun Gothic", sans-serif; color: var(--ink);
+    border: 4px solid var(--ink); background: var(--lime);
+    box-shadow: 0 6px 0 var(--ink);
+    transition: transform .08s, box-shadow .08s;
+  }
+  button:active { transform: translateY(5px); box-shadow: 0 1px 0 var(--ink); }
+  button:disabled { filter: saturate(.35) brightness(1.05); cursor: default; }
+  #lapBtn { background: #8fb2ff; }
+  #startBtn.running { background: var(--hotpink); }
+
+  /* 포토카드 랩 기록 */
+  .cards { min-height: 56px; border: 3px dashed var(--lav); border-radius: 16px; padding: 10px; background: #fff; }
+  .cards .empty { text-align: center; color: #a592e0; font-size: 13px; padding: 10px 0; }
+  ul { list-style: none; padding: 0; margin: 0; max-height: 230px; overflow-y: auto; display: grid; gap: 8px; }
+  li.pc {
+    display: flex; align-items: stretch; border: 3px solid var(--ink); border-radius: 12px; overflow: hidden;
+    background: var(--cream); box-shadow: 3px 3px 0 var(--shadow); font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  li.pc .no { width: 54px; display: grid; place-items: center; background: var(--c); border-right: 3px solid var(--ink); font-size: 15px; }
+  li.pc .t { flex: 1; padding: 9px 12px; display: flex; justify-content: space-between; align-items: center; }
+  li.pc .tag { font-size: 11px; letter-spacing: 1px; }
+  li.pc.best .t { background: linear-gradient(110deg, #ffd1e8, #d4e8ff, #d6ffe9, #fff3b8, #e5d4ff, #ffd1e8); background-size: 200% 100%; animation: holo 3s linear infinite; }
+  @keyframes holo { to { background-position: 200% 0; } }
+  li.pc.worst .tag { color: #d6457a; }
+
+  .hint { text-align: center; font-size: 12px; color: #7a63c9; margin: 14px 0 12px; }
+  .sheet { display: flex; justify-content: center; gap: 14px; font-size: 24px; margin-bottom: 18px; }
+  .sheet span:nth-child(odd) { transform: rotate(-8deg); }
+  .sheet span:nth-child(even) { transform: rotate(8deg); }
+  .sheet span { filter: drop-shadow(0 2px 0 #fff) drop-shadow(0 0 1px var(--ink)); }
+
+  /* 무대 아치 카운터 */
+  .counter {
+    height: 34px; margin: 0 -22px;
+    background:
+      radial-gradient(circle 11px at 50% 100%, var(--cream) 97%, transparent 100%) 0 0 / 38px 100% repeat-x,
+      linear-gradient(180deg, var(--hotpink), var(--lav));
+    border-top: 4px solid var(--ink);
+  }
+
+  .sticker { position: absolute; z-index: 4; font-size: 28px; filter: drop-shadow(2px 2px 0 #fff) drop-shadow(0 0 1px var(--ink)); }
+  .s1 { top: 70px; left: -22px; transform: rotate(-14deg); }
+  .s2 { top: 160px; right: -22px; transform: rotate(14deg); }
+  .s3 { bottom: 120px; left: -20px; transform: rotate(-8deg); }
+</style>
+</head>
+<body>
+<div class="stage" id="stage" aria-hidden="true">
+  <div class="bokeh"></div>
+  <div class="orb a"></div><div class="orb b"></div><div class="orb c"></div>
+  <svg class="palm l" viewBox="0 0 230 330"><use href="#palmShape"/></svg>
+  <svg class="palm r" viewBox="0 0 230 330"><use href="#palmShape"/></svg>
+  <div class="floor"><div class="counter-bg"></div><div class="steps"></div></div>
+  <svg class="lights" id="lights" viewBox="0 0 1000 70" preserveAspectRatio="xMidYMin slice"></svg>
+  <svg class="ball" viewBox="0 0 74 150">
+    <defs>
+      <radialGradient id="mirror" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#fff"/><stop offset=".55" stop-color="#d9c9ff"/><stop offset="1" stop-color="#8a6fe0"/></radialGradient>
+      <clipPath id="ballClip"><circle cx="37" cy="108" r="34"/></clipPath>
+    </defs>
+    <line x1="37" y1="0" x2="37" y2="74" stroke="#6a4fc0" stroke-width="2"/>
+    <circle cx="37" cy="108" r="34" fill="url(#mirror)" stroke="#6a4fc0" stroke-width="2.5"/>
+    <g clip-path="url(#ballClip)" stroke="#6a4fc0" stroke-width="1" opacity=".5" fill="none">
+      <ellipse cx="37" cy="108" rx="14" ry="34"/><ellipse cx="37" cy="108" rx="26" ry="34"/>
+      <path d="M0 90H74M0 108H74M0 126H74"/>
+    </g>
+    <circle cx="26" cy="96" r="4" fill="#fff"/>
+  </svg>
+</div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="palmShape">
+      <path d="M62 330 Q96 220 112 124" fill="none" stroke="#5a3fb0" stroke-width="9" stroke-linecap="round"/>
+      <g transform="translate(112 124)" fill="#6d4fc4">
+        <path id="leaf" d="M0 0 C30 -44 96 -54 150 -18 C98 -26 42 -16 0 0Z"/>
+        <use href="#leaf" transform="rotate(-150)"/><use href="#leaf" transform="rotate(-118)"/>
+        <use href="#leaf" transform="rotate(-84)"/><use href="#leaf" transform="rotate(-48)"/>
+        <use href="#leaf" transform="rotate(-16)"/><use href="#leaf" transform="rotate(22)"/>
+        <use href="#leaf" transform="rotate(58)"/>
+      </g>
+    </g>
+  </defs>
+</svg>
+<div class="wrap">
+  <svg class="tokki" viewBox="0 0 160 170" aria-hidden="true">
+    <defs>
+      <linearGradient id="disc" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#d9c2ff"/><stop offset=".5" stop-color="#8f6bff"/><stop offset="1" stop-color="#ff9ee3"/>
+      </linearGradient>
+    </defs>
+    <g transform="rotate(-8 47 98)"><rect x="30" y="2" width="34" height="98" rx="17" fill="#fff" stroke="#3b2a78" stroke-width="3.5"/><rect x="39" y="14" width="16" height="66" rx="8" fill="#e5d6ff"/></g>
+    <g transform="rotate(8 113 98)"><rect x="96" y="2" width="34" height="98" rx="17" fill="#fff" stroke="#3b2a78" stroke-width="3.5"/><rect x="105" y="14" width="16" height="66" rx="8" fill="#e5d6ff"/></g>
+    <ellipse cx="80" cy="125" rx="70" ry="44" fill="#fff" stroke="#3b2a78" stroke-width="3.5"/>
+    <circle cx="50" cy="124" r="11" fill="url(#disc)" stroke="#3b2a78" stroke-width="3"/><circle cx="46" cy="120" r="3" fill="#fff"/>
+    <circle cx="110" cy="124" r="11" fill="url(#disc)" stroke="#3b2a78" stroke-width="3"/><circle cx="106" cy="120" r="3" fill="#fff"/>
+    <path d="M75 130 Q80 127 85 130 Q85 136 80 138 Q75 136 75 130Z" fill="#ff9ee3" stroke="#3b2a78" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M72 143 Q76 148 80 143 Q84 148 88 143" fill="none" stroke="#3b2a78" stroke-width="2.5" stroke-linecap="round"/>
+    <ellipse cx="30" cy="138" rx="9" ry="5" fill="#ffb6e6" opacity=".7"/><ellipse cx="130" cy="138" rx="9" ry="5" fill="#ffb6e6" opacity=".7"/>
+  </svg>
+  <div class="girls" id="girls"></div>
+  <div class="card">
+    <div class="banner">BUNNY ♡ PUFF STOPWATCH</div>
+    <div class="screen">
+      <i></i><i></i><i></i><i></i>
+      <span class="rec">● REC</span><span class="batt">▮▮▮</span>
+      <div class="time" id="display">00:00.00</div>
+      <div class="stamp" id="stamp"></div>
+    </div>
+    <div class="buttons">
+      <div class="bbtn"><button id="lapBtn" disabled>랩</button></div>
+      <div class="bbtn"><button id="startBtn">시작</button></div>
+    </div>
+    <div class="cards">
+      <div class="empty" id="empty">✿ 랩을 찍으면 포토카드가 나와요 ✿</div>
+      <ul id="laps"></ul>
+    </div>
+    <p class="hint">SPACE 시작/정지 · L 랩 · R 초기화</p>
+    <div class="sheet"><span>🐰</span><span>🪩</span><span>✨</span><span>💿</span><span>📷</span></div>
+    <div class="counter"></div>
+  </div>
+  <span class="sticker s1">🪩</span>
+  <span class="sticker s2">✨</span>
+  <span class="sticker s3">💜</span>
+</div>
+<script>
+  /* ---------- 무대 의상색과 헤어 스타일을 따라 한 다섯 소녀 ---------- */
+  const INK = '#3b2a78';
+  const HAIR = '#2b2433';
+  const SKIN = '#ffe3cc';
+  const GIRLS = [
+    { style: 'pigtail', top: '#ff7fb8', mouth: 'smile' },                 // 핫핑크 + 양갈래
+    { style: 'buns',    top: '#ffd84a', mouth: 'open' },                  // 노랑 + 위로 올린 두 똥머리
+    { style: 'horns',   top: '#a6e83f', mouth: 'cat', wink: true },       // 라임 + 고양이 귀 머리
+    { style: 'long',    top: '#3f7bff', mouth: 'smile', clip: true },     // 블루 + 클립 단 긴 생머리
+    { style: 'long',    top: '#cdb8ff', mouth: 'open', locks: true },     // 라벤더 + 낮은 양갈래 긴 머리
+  ];
+
+  function eye(cx, wink) {
+    if (wink) return `<path d="M${cx - 11} 57 Q${cx} 47 ${cx + 11} 57" fill="none" stroke="${INK}" stroke-width="3.5" stroke-linecap="round"/>`;
+    return `<ellipse cx="${cx}" cy="54" rx="12" ry="14" fill="#fff" stroke="${INK}" stroke-width="3"/>
+      <circle cx="${cx + 1}" cy="56" r="9" fill="#4a3560"/><circle cx="${cx + 1}" cy="56" r="5.2" fill="#1b1230"/>
+      <circle cx="${cx + 4}" cy="52" r="2.6" fill="#fff"/><circle cx="${cx - 3}" cy="60" r="1.4" fill="#fff"/>`;
+  }
+
+  function girl(c) {
+    const hair = (inner) => `<${inner} fill="${HAIR}" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/>`;
+    const back = {
+      pigtail: hair('ellipse cx="9" cy="78" rx="10" ry="30"') + hair('ellipse cx="91" cy="78" rx="10" ry="30"'),
+      buns:    hair('circle cx="24" cy="18" r="10"') + hair('circle cx="76" cy="18" r="10"'),
+      horns:   hair('path d="M14 42 L22 3 L46 26Z"') + hair('path d="M86 42 L78 3 L54 26Z"'),
+      long:    hair('ellipse cx="50" cy="68" rx="45" ry="44"'),
+    }[c.style];
+    const tie = c.style === 'pigtail'
+      ? `<circle cx="11" cy="50" r="4.5" fill="${c.top}" stroke="${INK}" stroke-width="2.5"/><circle cx="89" cy="50" r="4.5" fill="${c.top}" stroke="${INK}" stroke-width="2.5"/>` : '';
+    const locks = c.locks
+      ? hair('path d="M9 58 Q1 92 12 118 L26 112 Q20 88 24 62Z"') + hair('path d="M91 58 Q99 92 88 118 L74 112 Q80 88 76 62Z"') : '';
+    const clip = c.clip
+      ? `<rect x="64" y="31" width="18" height="7" rx="3.5" fill="#cdb8ff" stroke="${INK}" stroke-width="2.5" transform="rotate(22 73 34)"/>` : '';
+    const mouth = {
+      smile: `<path d="M43 74 Q50 80 57 74" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round"/>`,
+      open:  `<path d="M42 72 Q50 86 58 72Z" fill="#ff7a9a" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/>`,
+      cat:   `<path d="M41 74 Q45.5 80 50 74 Q54.5 80 59 74" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round"/>`,
+    }[c.mouth];
+    const fringe = c.locks
+      ? `<path d="M11 52 Q50 -14 89 52 L89 42 Q70 30 50 32 Q30 30 11 42Z" fill="${HAIR}" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/>`
+      : `<path d="M11 50 Q50 -14 89 50 Q72 26 50 32 Q28 26 11 50Z" fill="${HAIR}" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/>`;
+    return `<svg class="girl" viewBox="0 0 100 128" aria-hidden="true">
+      ${back}
+      <rect x="42" y="78" width="16" height="16" fill="${SKIN}" stroke="${INK}" stroke-width="3"/>
+      <path d="M10 130 Q12 94 50 90 Q88 94 90 130Z" fill="${c.top}" stroke="${INK}" stroke-width="3"/>
+      ${locks}
+      <ellipse cx="50" cy="52" rx="38" ry="33" fill="${SKIN}" stroke="${INK}" stroke-width="3"/>
+      ${fringe}${tie}${clip}${eye(34, false)}${eye(66, c.wink)}
+      <ellipse cx="20" cy="70" rx="6" ry="3.5" fill="#ff9ccb" opacity=".55"/><ellipse cx="80" cy="70" rx="6" ry="3.5" fill="#ff9ccb" opacity=".55"/>
+      ${mouth}
+    </svg>`;
+  }
+  document.getElementById('girls').innerHTML = GIRLS.map(girl).join('');
+
+  /* ---------- 무대 배경: 요정 조명과 반짝이 ---------- */
+  (function buildStage() {
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const lights = document.getElementById('lights');
+    let path = 'M0 10';
+    for (let k = 0; k < 4; k++) path += ` Q${125 + 250 * k} 60 ${250 * (k + 1)} 10`;
+    lights.insertAdjacentHTML('beforeend', `<path d="${path}" fill="none" stroke="#6a4fc0" stroke-width="2"/>`);
+    const bulbs = [[62.5, 28.8], [125, 35], [187.5, 28.8]];
+    const colors = ['#fff6a8', '#ffd0f6', '#d9c9ff', '#bff3ff'];
+    let i = 0;
+    for (let k = 0; k < 4; k++) for (const [x, y] of bulbs) {
+      const c = document.createElementNS(svgNS, 'circle');
+      c.setAttribute('cx', x + 250 * k); c.setAttribute('cy', y + 4); c.setAttribute('r', 5.5);
+      c.setAttribute('fill', colors[i % colors.length]);
+      c.setAttribute('style', `animation-delay:${(i % 6) * 0.4}s;filter:drop-shadow(0 0 5px ${colors[i % colors.length]})`);
+      lights.appendChild(c); i++;
+    }
+    const stage = document.getElementById('stage');
+    const spots = [[8, 12, 18], [22, 40, 14], [34, 8, 22], [60, 20, 16], [73, 44, 20], [90, 58, 14], [14, 70, 16], [46, 78, 12], [84, 28, 22], [66, 66, 14]];
+    spots.forEach(([x, y, s], n) => {
+      const el = document.createElement('div');
+      el.className = 'spark'; el.textContent = '✦';
+      el.style.cssText = `left:${x}%;top:${y}%;font-size:${s}px;animation-delay:${n * 0.3}s`;
+      stage.appendChild(el);
+    });
+  })();
+
+  /* ---------- 날짜 스탬프 ---------- */
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  document.getElementById('stamp').textContent = `'${p(d.getFullYear() % 100)} ${p(d.getMonth() + 1)} ${p(d.getDate())}`;
+
+  /* ---------- 스톱워치 ---------- */
+  const display = document.getElementById('display');
+  const startBtn = document.getElementById('startBtn');
+  const lapBtn = document.getElementById('lapBtn');
+  const lapList = document.getElementById('laps');
+  const empty = document.getElementById('empty');
+  const COLORS = ['var(--hotpink)', 'var(--yellow)', 'var(--lime)', 'var(--blue)', 'var(--lilac)'];
+
+  let running = false, startTime = 0, elapsed = 0, lastLapTotal = 0, raf = null;
+  let laps = [];
+
+  const fmt = ms => {
+    const m = Math.floor(ms / 60000);
+    const s = Math.floor(ms / 1000) % 60;
+    const cs = Math.floor(ms / 10) % 100;
+    return `${p(m)}:${p(s)}.${p(cs)}`;
+  };
+
+  const now = () => elapsed + (running ? performance.now() - startTime : 0);
+
+  function tick() {
+    display.textContent = fmt(now());
+    raf = requestAnimationFrame(tick);
+  }
+
+  function renderLaps() {
+    lapList.innerHTML = '';
+    empty.style.display = laps.length ? 'none' : '';
+    const min = Math.min(...laps), max = Math.max(...laps);
+    for (let i = laps.length - 1; i >= 0; i--) {
+      const li = document.createElement('li');
+      li.className = 'pc';
+      let tag = '';
+      if (laps.length > 1 && laps[i] === min) { li.classList.add('best'); tag = 'HOLO ★'; }
+      else if (laps.length > 1 && laps[i] === max) { li.classList.add('worst'); tag = 'ZZZ 💤'; }
+      li.style.setProperty('--c', COLORS[i % COLORS.length]);
+      li.innerHTML = `<div class="no">#${i + 1}</div><div class="t"><span>${fmt(laps[i])}</span><span class="tag">${tag}</span></div>`;
+      lapList.appendChild(li);
+    }
+  }
+
+  function toggle() {
+    if (running) {
+      elapsed = now();
+      running = false;
+      cancelAnimationFrame(raf);
+      display.textContent = fmt(elapsed);
+    } else {
+      startTime = performance.now();
+      running = true;
+      tick();
+    }
+    document.body.classList.toggle('running', running);
+    startBtn.textContent = running ? '정지' : '시작';
+    startBtn.classList.toggle('running', running);
+    lapBtn.textContent = running ? '랩' : '재설정';
+    lapBtn.disabled = !running && elapsed === 0;
+  }
+
+  function lapOrReset() {
+    if (running) {
+      const total = now();
+      laps.push(total - lastLapTotal);
+      lastLapTotal = total;
+      renderLaps();
+    } else {
+      elapsed = 0; lastLapTotal = 0; laps = [];
+      display.textContent = fmt(0);
+      renderLaps();
+      lapBtn.textContent = '랩';
+      lapBtn.disabled = true;
+    }
+  }
+
+  startBtn.addEventListener('click', toggle);
+  lapBtn.addEventListener('click', lapOrReset);
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space') { e.preventDefault(); toggle(); }
+    else if (e.key.toLowerCase() === 'l' && running) lapOrReset();
+    else if (e.key.toLowerCase() === 'r' && !running) lapOrReset();
+  });
+</script>
+</body>
+</html>
